@@ -1,0 +1,2 @@
+Diversion tactic from main M cluster  -> P cluster taht is closer than P' hwoever does NOT hold the true NN meanwhile the true NN is 
+a part of P', with it being grid overlayed onto it. 
