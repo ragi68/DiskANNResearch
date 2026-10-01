@@ -31,5 +31,17 @@ std::vector<Vertex*> TestANN::RandomVertices(uint32_t n, uint32_t dim, std::mt19
 }
 
 
+// fraction of `truth` (the brute-force top-k) present in `result`
+float TestANN::RecallAtK(const std::vector<Vertex*>& result, const std::vector<Vertex*>& truth) {
+    if (truth.empty()) return 1.0f;
+    std::unordered_set<uint32_t> found;
+    for (Vertex* v : result) found.insert(v->id);
+    uint32_t hits = 0;
+    for (Vertex* v : truth)
+        if (found.count(v->id)) ++hits;
+    return static_cast<float>(hits) / static_cast<float>(truth.size());
+}
+
+
 
 

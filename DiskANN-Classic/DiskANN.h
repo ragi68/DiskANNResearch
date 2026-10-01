@@ -8,6 +8,7 @@
 #include <math.h>
 #include <random>
 #include <numeric>
+#include <unordered_set>
 
 struct Vertex {
   uint32_t id;

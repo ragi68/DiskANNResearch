@@ -1,0 +1,72 @@
+CLUSTER GRAPH BOUNDARY EDGES vs VAMANA - RESULTS (2026-09-30)
+==============================================================
+
+Shared cluster graph base (both ideas):
+  - k-means with C = sqrt(n) clusters (141 at n = 20000)
+  - slow preprocessing inside each cluster (RobustPruning against the whole cluster), pruneR = 70
+  - hub node -> every cluster medoid; search = hub -> nearest medoid -> greedy search
+  - totalR = 125 caps out-degree after boundary edges are added
+
+
+IDEA 1: RANDOM POOL EDGES  (AddBoundaryEdges, adjacencyEdges.cpp)
+-----------------------------------------------------------------
+  1. Each point of cluster i joins the pool "i facing j" for its 14 nearest foreign medoids
+     (10% of clusters), scored by margin d(x, m_j) - d(x, m_i).
+  2. Each pool keeps its 40 smallest-margin points.
+  3. Clusters are adjacent if either side has a pool facing the other.
+  4. For each adjacent pair, both directions: 25 edges between uniformly random pool points.
+  Params: edgesPerPair = 25, poolSize = 40, numAdjacentClusters = 14.
+
+
+IDEA 2: RANKED EDGES  (AddBoundaryEdgesRanked, adjacencyEdges.cpp)
+------------------------------------------------------------------
+  1. Every vertex x computes its bisector distance to each foreign cluster j:
+       h_j = (d(x,m_j)^2 - d(x,m_i)^2) / (2 * d(m_i,m_j))
+     and keeps the clustersPerVertex clusters with smallest h.
+  2. In each, takes the candperCluster = 50 points nearest to x.
+  3. Draws edgesPerCluster targets with P(rank r) ~ 1/r (Kleinberg-style rank weighting).
+  4. (Added after the runs below, not yet measured) reverse edge y -> x for each x -> y.
+  Params: clustersPerVertex = 14, edgesPerCluster = 3  ->  up to 42 cross edges per vertex.
+
+
+RESULTS: 128-D, n = 20000 uniform [0,1000], 100 queries, search L = 125, seed 42
+----------------------------------------------------------------------------------
+  Method                                   Build      Recall@10  Worst q  Avg query  Max degree
+  Vamana FastGraphCreation (L=125, R=70)   2107 s     0.937      -        5.88 ms    70
+  Idea 1: random pool                        67 s     0.523      0.0      6.31 ms    125
+  Idea 2: ranked, 14 clusters x 3 edges      83 s     0.743      0.4      7.95 ms    125 (~112 used)
+
+  Other runs at 128-D (same data/queries):
+  Vamana FastGraphCreation (L=10, R=70)     308 s*    0.765      -       66.5 ms**   70
+  Idea 2: ranked, 1-2 clusters (~3 edges)    81 s*    0.275      0.0      4.98 ms    125
+
+   *  build overlapped with another run; time inflated
+   ** measured with the old GreedySearch (linear scans, repeated sorts); not comparable
+
+
+RESULTS: 32-D, n = 20000 uniform [0,1000], 100 queries, seed 42 (no matching Vamana run)
+------------------------------------------------------------------------------------------
+  Method                                          L=50    L=125   L=250   Avg query @125
+  Idea 1: random pool                             0.530   0.766   0.916   3.15 ms
+  Idea 2: ranked, 1-2 clusters (defaults 2/1/1)   0.282   0.469   0.619   2.32 ms
+  Idea 2: ranked, 1-2 clusters, budget 12/8/20    0.469   0.662   0.797   3.01 ms
+
+
+COMPARABILITY NOTES
+-------------------
+  - Same across 128-D runs: data, queries, alpha = 1.2, search L, recall = true top-10 found in visited set.
+  - NOT same: degree. Cluster graphs may use up to 125 edges/node vs Vamana's 70.
+  - Vamana query time uses the rewritten GreedySearch (cached distances, hash sets);
+    clusterGreedySearch already worked that way, so query times are comparable.
+  - Vamana build is still inflated by RobustPruning recomputing distances inside its sort comparator.
+
+
+TAKEAWAYS
+---------
+  - Build: cluster graphs build ~25-30x faster than Vamana (no back-edge re-pruning, candidate sets ~sqrt(n)).
+  - Recall: ranked edges beat random pools (0.523 -> 0.743) but trail Vamana (0.937), despite more edges.
+  - Coverage matters most: ranked edges into 1-2 clusters gave 0.275; spreading over 14 clusters gave 0.743.
+  - Query cost: Vamana ~26% cheaper per query than idea 2 (fewer edges per node).
+
+  Next: multi-medoid search entry, alpha-diversified targets per cluster, degree-matched comparison,
+  and re-run idea 2 with reverse edges.

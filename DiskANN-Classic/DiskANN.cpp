@@ -1,55 +1,52 @@
 #include "DiskANN.h"
 
 std::vector<Vertex*> GreedySearch(Vertex& s, Vertex& q, uint32_t L) {
-    std::vector<Vertex*> A;
-    std::vector<Vertex*> U;
+    if (L == 0) L = 1;
 
-    A.push_back(&s);
+    using Entry = std::pair<float, Vertex*>;  // (distance to q, vertex), cached
+    std::vector<Entry> A;                     // beam
+    std::vector<Entry> U;                     // visited, in expansion order
+    std::unordered_set<Vertex*> inA, visited;
+
+    A.push_back({distance(s, q), &s});
+    inA.insert(&s);
 
     while(true){
-        //find closest v in A \ U 
-        Vertex* closest = nullptr;
-        float bestDist = 0.0f;
-
-        for(Vertex* v : A){
-            bool visited = std::any_of(U.begin(), U.end(), [&](Vertex* u) { return u == v; });
-            if(visited) continue;
-
-            float d = distance(*v, q);
-            if(closest == nullptr || d < bestDist) {
-                closest = v;
-                bestDist = d;
-            }
+        //find closest v in A \ U
+        int best = -1;
+        for (size_t i = 0; i < A.size(); ++i) {
+            if (visited.count(A[i].second)) continue;
+            if (best < 0 || A[i].first < A[best].first) best = static_cast<int>(i);
         }
+        if (best < 0) break;
 
-        if(closest == nullptr){
-            break;
-        }
-        
-        //expand A to include neighbors of closest
-        for(Vertex* neighbor : closest->out) {
-            bool alreadyInA = std::any_of(A.begin(), A.end(), [&](Vertex* u) { return u == neighbor; });
-            if(!alreadyInA) {
-                A.push_back(neighbor);
-            }
-        }
-        
-        U.push_back(closest);
+        // copy before modifying A (push_back can invalidate references)
+        Vertex* closest = A[best].second;
+        float dClosest = A[best].first;
+        visited.insert(closest);
+        U.push_back({dClosest, closest});
 
-        //trim A to closest L vertices to q
-        if(A.size() > L){
-            std::sort(A.begin(), A.end(), [&](Vertex* a, Vertex* b) {
-                return distance(*a, q) < distance(*b, q);
-            });
+        //expand A to include neighbors of closest; each distance computed once
+        for (Vertex* neighbor : closest->out)
+            if (inA.insert(neighbor).second)
+                A.push_back({distance(*neighbor, q), neighbor});
+
+        //trim A to closest L vertices to q, using the cached distances
+        if (A.size() > L) {
+            std::sort(A.begin(), A.end(),
+                      [](const Entry& a, const Entry& b) { return a.first < b.first; });
+            for (size_t i = L; i < A.size(); ++i) inA.erase(A[i].second);
             A.resize(L);
         }
-
-        //sort visited by increasing dist to q
-        std::sort(U.begin(), U.end(), [&](Vertex* a, Vertex* b) {
-            return distance(*a, q) < distance(*b, q);
-        });
     }
-    return U;
+
+    //sort visited by increasing dist to q, once at the end
+    std::sort(U.begin(), U.end(),
+              [](const Entry& a, const Entry& b) { return a.first < b.first; });
+    std::vector<Vertex*> result;
+    result.reserve(U.size());
+    for (const Entry& e : U) result.push_back(e.second);
+    return result;
 }
 
 void GraphCreation(std::vector<Vertex*>& vertices, float alpha, uint32_t R) {

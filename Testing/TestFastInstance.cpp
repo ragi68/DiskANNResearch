@@ -4,7 +4,7 @@ int testFast(){
     TestANN test;
 
     std::mt19937 rng(42); // Fixed seed for reproducibility
-    uint32_t numVertices = 1000;
+    uint32_t numVertices = 20000;
     uint32_t dim = 128;
     uint32_t k = 10;
 
@@ -22,16 +22,30 @@ int testFast(){
     }
 
     std::cout << "Fast Preprocessing";
-    FastGraphCreation(vertices, 1.2, 10, 70, rng);
+    FastGraphCreation(vertices, 1.2, 125, 70, rng);
     std::vector<Vertex*> results = GreedySearch(*Medoid(vertices), q, 125);
     std::cout << "Fast Disk ANN\n";
     for (const auto& v : results) {
         std::cout << v->id << " ";
     }
 
+    float recall = test.RecallAtK(results, knnResults);
+    std::cout << "\nRecall@" << k << " = " << recall << "\n";
+
+    bool ok = true;
+    const float minRecall = 0.5f;
+    if (recall < minRecall) {
+        std::cerr << "Recall@" << k << " (" << recall << ") below threshold ("
+                   << minRecall << ")\n";
+        ok = false;
+    }
+
     for (auto& v : vertices) {
         delete v;
     }
 
-    return 0;   
+    if (ok) std::cout << "testFast PASSED\n";
+    else std::cout << "testFast FAILED\n";
+
+    return ok ? 0 : 1;
 }

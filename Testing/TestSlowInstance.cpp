@@ -29,9 +29,23 @@ int testSlow(){
         std::cout << v->id << " ";
     }
 
+    float recall = test.RecallAtK(results, knnResults);
+    std::cout << "\nRecall@" << k << " = " << recall << "\n";
+
+    bool ok = true;
+    const float minRecall = 0.5f;
+    if (recall < minRecall) {
+        std::cerr << "Recall@" << k << " (" << recall << ") below threshold ("
+                   << minRecall << ")\n";
+        ok = false;
+    }
+
     for (auto& v : vertices) {
         delete v;
     }
 
-    return 0;   
+    if (ok) std::cout << "testSlow PASSED\n";
+    else std::cout << "testSlow FAILED\n";
+
+    return ok ? 0 : 1;
 }
