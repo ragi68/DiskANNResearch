@@ -84,8 +84,9 @@ int run() {
     uint32_t numAdjacentClusters = std::max<uint32_t>(1, static_cast<uint32_t>(
         std::lround(0.10 * numClusters)));
 
-    // Two constructions on the same vertices and queries: old random pool edges,
-    // then rank-weighted edges. CreateClusterGraph clears every out list first,
+    // Three constructions on the same vertices and queries: old random pool edges,
+    // rank-weighted edges, then the boundary-node backbone (slow preprocessing over
+    // the top boundaryProportion of each cluster). CreateClusterGraph clears every out list first,
     // so each build starts clean; each graph is searched before the next build
     // overwrites the shared vertices' edges. Reports numbers only, no recall
     // threshold: the test fails only if a graph is structurally broken.
@@ -94,24 +95,32 @@ int run() {
     // clustersPerVertex nearest foreign clusters (10% of all clusters, same as
     // numAdjacentClusters: 14 at n=20000).
     const uint32_t clustersPerVertex = numAdjacentClusters, edgesPerCluster = 3;
+    const double boundaryProportion = 0.2;
 
     using Clock = std::chrono::steady_clock;
+    using ClusterANN::EdgeMode;
     bool ok = true;
-    for (bool ranked : {false, true}) {
-        const char* label = ranked ? "ranked" : "old";
+    for (EdgeMode mode : {EdgeMode::Random, EdgeMode::Ranked, EdgeMode::Backbone}) {
+        const char* label = mode == EdgeMode::Ranked   ? "ranked"
+                          : mode == EdgeMode::Backbone ? "backbone"
+                          :                              "old";
         std::cout << "Cluster Graph Creation [" << label << " boundary edges]";
-        if (ranked) std::cout << " (clustersPerVertex=" << clustersPerVertex
-                              << ", edgesPerCluster=" << edgesPerCluster << ")";
+        if (mode == EdgeMode::Ranked)
+            std::cout << " (clustersPerVertex=" << clustersPerVertex
+                      << ", edgesPerCluster=" << edgesPerCluster << ")";
+        if (mode == EdgeMode::Backbone)
+            std::cout << " (boundaryProportion=" << boundaryProportion << ")";
         std::cout << "\n";
 
         auto t0 = Clock::now();
         ClusterANN::ClusterGraph g = ClusterANN::CreateClusterGraph(
             vertices, /*alpha=*/1.2f, /*pruneR=*/70,
             /*totalR=*/125, /*edgesPerPair=*/25, /*poolSize=*/40,
-            numAdjacentClusters, ranked, clustersPerVertex, edgesPerCluster);
+            numAdjacentClusters, mode, clustersPerVertex, edgesPerCluster,
+            /*medoidR=*/24, boundaryProportion);
         double buildMs = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 
-        if (!g.hub || g.clusters.empty() || g.medoids.size() != g.clusters.size()) {
+        if (g.clusters.empty() || g.medoids.size() != g.clusters.size()) {
             std::cerr << "cluster graph [" << label << "] was not built correctly\n";
             ok = false;
             continue;

@@ -8,7 +8,6 @@
 #include <math.h>
 #include <random>
 #include <numeric>
-#include <memory>
 #include <limits>
 #include <set>
 #include <utility>
@@ -34,7 +33,6 @@ struct Cluster{
 };
 
 struct ClusterGraph {
-  std::unique_ptr<Vertex> hub;      // universal node; heap-allocated so its address stays stable
   std::vector<Cluster> clusters;
   std::vector<Vertex*> medoids;     // medoids[j] is the medoid of clusters[j]
   std::vector<std::vector<uint32_t>> medoidGraph;  // coarse layer: medoidGraph[j] = neighbor cluster indices of medoid j
@@ -44,16 +42,26 @@ struct ClusterGraph {
 std::vector<Cluster> KClustering(std::vector<Vertex*> v, uint32_t c, uint32_t I);
 void RobustPruning(Vertex& v, std::vector<Vertex*> U, float alpha, uint32_t R);
 
+// How cross-cluster edges are added after the per-cluster graphs are built.
+enum class EdgeMode {
+  Random,    // AddBoundaryEdges
+  Ranked,    // AddBoundaryEdgesRanked
+  Backbone   // BackBoneGraph
+};
+
 ClusterGraph CreateClusterGraph(std::vector<Vertex*> v, float alpha, uint32_t pruneR, uint32_t totalR,
     uint32_t edgesPerPair, uint32_t poolSize,
     uint32_t numAdjacentClusters = 1,
-    bool rankedEdges = false,   // true: AddBoundaryEdgesRanked
+    EdgeMode edgeMode = EdgeMode::Random,
     uint32_t clustersPerVertex = 7, uint32_t edgesPerCluster = 3,  // ranked knobs
-    uint32_t medoidR = 24
+    uint32_t medoidR = 24,
+    double boundaryProportion = 0.2  // backbone knob
 );
 
 // Coarse search picks the top p medoids to seed the fine beam; p = 1 starts from the single nearest medoid.
 std::vector<Vertex*> clusterGreedySearch(const ClusterGraph& g, Vertex& q, uint32_t L, uint32_t p = 1, uint32_t coarseL = 16);
+
+void findGlobalBoundaryNodes(const ClusterGraph& g, std::vector<Vertex*>& boundaryNodes, double proportion = 0.2);
 
 void AddBoundaryEdges(ClusterGraph& g, uint32_t edgesPerPair, uint32_t poolSize, uint32_t R,
    uint32_t numAdjacentClusters = 1, uint32_t seed = 12345);
@@ -64,10 +72,10 @@ void AddBoundaryEdgesRanked(ClusterGraph& g, uint32_t R, uint32_t candPerCluster
     uint32_t seed = 12345
 );
 
+void BackBoneGraph(ClusterGraph& g, float alpha, uint32_t pruneR, uint32_t totalR, double proportion = 0.2);
 
 // Coarse layer: slow preprocessing over the medoids only, stored in g.medoidGraph (kept out of Vertex::out).
 void topLevelEdges(ClusterGraph& g, float alpha, uint32_t medoidR);
-
 
 // Greedy beam search (width coarseL) over g.medoidGraph; returns the p medoids nearest q, nearest first.
 std::vector<Vertex*> coarseGreedySearch(const ClusterGraph& g, const Vertex& q, uint32_t p = 1,

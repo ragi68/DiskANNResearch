@@ -167,8 +167,8 @@ namespace ClusterANN {
     }
 
     ClusterGraph CreateClusterGraph(std::vector<Vertex*> v, float alpha, uint32_t pruneR, uint32_t totalR,
-        uint32_t edgesPerPair, uint32_t poolSize, uint32_t numAdjacentClusters, bool rankedEdges,
-        uint32_t clustersPerVertex, uint32_t edgesPerCluster, uint32_t medoidR){
+        uint32_t edgesPerPair, uint32_t poolSize, uint32_t numAdjacentClusters, EdgeMode edgeMode,
+        uint32_t clustersPerVertex, uint32_t edgesPerCluster, uint32_t medoidR, double boundaryProportion){
         ClusterGraph g;
         if (v.empty()) return g;
 
@@ -192,26 +192,19 @@ namespace ClusterANN {
         // ---- Coarse layer: slow preprocessing over the medoids ----
         topLevelEdges(g, alpha, medoidR);
 
-        // ---- Universal node ----
-        g.hub = std::make_unique<Vertex>();
-        g.hub->id = UINT32_MAX;  // sentinel; assumes real ids are < UINT32_MAX
-
-        // Give the hub real coordinates (the global mean) so distance(hub, x) is
-        // well defined. Otherwise distance() on its empty data vector would read
-        // out of bounds whenever the hub is the second argument.
-        const size_t dim = v[0]->data.size();
-        std::vector<double> mean(dim, 0.0);
-        for (Vertex* p : v)
-            for (size_t k = 0; k < dim; ++k) mean[k] += p->data[k];
-        g.hub->data.resize(dim);
-        for (size_t k = 0; k < dim; ++k)
-            g.hub->data[k] = static_cast<float>(mean[k] / v.size());
-
-        g.hub->out = g.medoids;  // hub -> medoid of every cluster
-
-        if (rankedEdges) AddBoundaryEdgesRanked(g, totalR, /*candperCluster=*/50,
-                                                clustersPerVertex, edgesPerCluster);
-        else             AddBoundaryEdges(g, edgesPerPair, poolSize, totalR, numAdjacentClusters);
+        // Cross-cluster edges. Backbone must run on the in-cluster-only out lists
+        // (its boundary score reads them), so it is an alternative, not an add-on.
+        switch (edgeMode) {
+            case EdgeMode::Random:
+                AddBoundaryEdges(g, edgesPerPair, poolSize, totalR, numAdjacentClusters);
+                break;
+            case EdgeMode::Ranked:
+                AddBoundaryEdgesRanked(g, totalR, /*candperCluster=*/50, clustersPerVertex, edgesPerCluster);
+                break;
+            case EdgeMode::Backbone:
+                BackBoneGraph(g, alpha, pruneR, totalR, boundaryProportion);
+                break;
+        }
 
         return g;
     }
@@ -250,12 +243,10 @@ namespace ClusterANN {
         visited.insert(v);
         U.push_back({dv, v});
 
-        // Expand neighbors; never re-enter the hub
-        for (Vertex* nb : v->out) {
-            if (nb->id == UINT32_MAX) continue;
+        // Expand neighbors
+        for (Vertex* nb : v->out)
             if (inA.insert(nb).second)
                 A.push_back({distance(*nb, q), nb});
-        }
 
         // Trim the beam to the L closest to q
         if (A.size() > L) {

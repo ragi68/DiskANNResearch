@@ -172,4 +172,51 @@ namespace ClusterANN {
             }
         }
 
+    //backbone over boundary nodes with slow preprocessing against every boundary node in OTHER clusters
+    // This builds a separate graph and merges it into the existing out-list of the node in the cluster, capped
+    // at total R edges per node. Every backbone edge crosses a cluster wall.
+    void BackBoneGraph(ClusterGraph& g, float alpha, uint32_t pruneR, uint32_t totalR, double proportion) {
+        std::vector<Vertex*> boundary;
+        findGlobalBoundaryNodes(g, boundary, proportion);
+        const uint32_t B = static_cast<uint32_t>(boundary.size());
+        if(B < 2) return;
+
+        //cluster index of every point, so each boundary node knows which candidates are its own
+        std::unordered_map<Vertex*, uint32_t> clusterOf;
+        for(uint32_t c = 0; c < g.clusters.size(); ++c)
+            for(Vertex* p : g.clusters[c].clusterPoints) clusterOf[p] = c;
+
+        //create a separate boundary node graph first by creating a temp/proxy graph
+        std::vector<Vertex> temp(B);
+        std::vector<uint32_t> tempCluster(B);
+        for(uint32_t j = 0; j < B; ++j){
+            temp[j].id = j;
+            temp[j].data = boundary[j]->data;
+            tempCluster[j] = clusterOf[boundary[j]];
+        }
+
+        //slow preprocessing: each boundary node against the boundary nodes of every other cluster
+        std::vector<Vertex*> candidates;
+        candidates.reserve(B);
+        for(uint32_t j = 0; j < B; ++j){
+            candidates.clear();
+            for(uint32_t i = 0; i < B; ++i)
+                if(tempCluster[i] != tempCluster[j]) candidates.push_back(&temp[i]);
+            RobustPruning(temp[j], candidates, alpha, pruneR);
+        }
+
+        //merge after the in-cluster edges and cap at totalR
+        for(uint32_t j = 0; j < B; ++j){
+            Vertex* x = boundary[j];
+            for(Vertex* y : temp[j].out){
+                if(x->out.size() >= totalR) break;
+                x->out.push_back(boundary[y->id]);
+            }
+        }
+    }
+
 }  // namespace ClusterANN
+
+
+
+
