@@ -13,19 +13,18 @@
 #include <utility>
 #include <unordered_map>
 #include <unordered_set>
+#include "../Core/core.h"  // Vertex, distance, RobustPruning, RobustPruningOcclude, Medoid
 
 
 
-// Namespaced because clusterANN's Vertex/distance would otherwise collide
-// with DiskANN-Classic/DiskANN.h's identically-named globals whenever both
-// headers land in the same translation unit (e.g. Testing/main.cpp).
+// Cluster-specific code lives in ClusterANN; the shared core is pulled in below
+// so existing unqualified and ClusterANN:: calls resolve to Core/.
 namespace ClusterANN {
 
-struct Vertex {
-  uint32_t id;
-  std::vector<float> data;
-  std::vector<Vertex*> out;
-};
+using ::Vertex;
+using ::distance;
+using ::RobustPruning;
+using ::Medoid;
 
 struct Cluster{
   uint32_t clusterID;
@@ -40,7 +39,6 @@ struct ClusterGraph {
 };
 
 std::vector<Cluster> KClustering(std::vector<Vertex*> v, uint32_t c, uint32_t I);
-void RobustPruning(Vertex& v, std::vector<Vertex*> U, float alpha, uint32_t R);
 
 // How cross-cluster edges are added after the per-cluster graphs are built.
 enum class EdgeMode {
@@ -80,9 +78,5 @@ void topLevelEdges(ClusterGraph& g, float alpha, uint32_t medoidR);
 // Greedy beam search (width coarseL) over g.medoidGraph; returns the p medoids nearest q, nearest first.
 std::vector<Vertex*> coarseGreedySearch(const ClusterGraph& g, const Vertex& q, uint32_t p = 1,
     uint32_t coarseL = 16);
-
-
-Vertex* Medoid(std::vector<Vertex*> v);
-float distance(const Vertex& u, const Vertex& v);
 
 }  // namespace ClusterANN

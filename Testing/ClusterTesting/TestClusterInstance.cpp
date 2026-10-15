@@ -1,4 +1,5 @@
-#include "../DiskANN-Cluster/clusterANN.h"
+#include "../../DiskANN-Cluster/clusterANN.h"
+#include "../../Core/core_testing.h"
 #include <random>
 #include <chrono>
 #include <stdio.h>
@@ -7,53 +8,15 @@
 // ===========================================================================
 //  Smoke test for clusterANN (DiskANN-Cluster/clusterANN.cpp).
 //
-//  clusterANN.h puts its Vertex/distance/etc. under the ClusterANN namespace
-//  so this file can be included alongside DiskANN.h-based tests (which have
-//  identically-named globals) in the same main.cpp build. Everything here
-//  lives in its own namespace too, so `using ClusterANN::Vertex` doesn't
-//  collide with DiskANN.h's global ::Vertex in that shared build.
+//  Vertex and the brute-force/recall helpers come from Core/, shared with the
+//  DiskANN.h-based tests. run() lives in its own namespace so it doesn't
+//  collide with anything else included into main.cpp.
 // ===========================================================================
 
 namespace ClusterTest {
 
-using ClusterANN::Vertex;
-
-// brute force knn search for ground truth
-std::vector<Vertex*> BruteForceKNN(const std::vector<Vertex*>& vertices, Vertex q, uint32_t k) {
-    std::vector<Vertex*> sorted = vertices;
-    std::sort(sorted.begin(), sorted.end(), [&](Vertex* a, Vertex* b) {
-        return ClusterANN::distance(*a, q) < ClusterANN::distance(*b, q);
-    });
-    if (sorted.size() > k) sorted.resize(k);
-    return sorted;
-}
-
-// generate random vertices
-std::vector<Vertex*> RandomVertices(uint32_t n, uint32_t dim, std::mt19937& rng) {
-    std::uniform_real_distribution<float> dist(0.0f, 1000.0f);
-    std::vector<Vertex*> vertices;
-    vertices.reserve(n);
-    for (uint32_t i = 0; i < n; i++) {
-        Vertex* v = new Vertex();
-        v->id = i;
-        for (uint32_t j = 0; j < dim; j++) v->data.push_back(dist(rng));
-        vertices.push_back(v);
-    }
-    return vertices;
-}
-
-// fraction of `truth` (the brute-force top-k) present in `result`
-float RecallAtK(const std::vector<Vertex*>& result, const std::vector<Vertex*>& truth) {
-    if (truth.empty()) return 1.0f;
-    std::unordered_set<uint32_t> found;
-    for (Vertex* v : result) found.insert(v->id);
-    uint32_t hits = 0;
-    for (Vertex* v : truth)
-        if (found.count(v->id)) ++hits;
-    return static_cast<float>(hits) / static_cast<float>(truth.size());
-}
-
 int run() {
+    TestANN test;
     std::mt19937 rng(42); // fixed seed for reproducibility
     uint32_t numVertices = 20000;
     uint32_t dim = 128;
@@ -61,7 +24,7 @@ int run() {
 
     uint32_t numQueries = 100;
 
-    std::vector<Vertex*> vertices = RandomVertices(numVertices, dim, rng);
+    std::vector<Vertex*> vertices = test.RandomVertices(numVertices, dim, rng);
 
     // Queries get ids outside the range of generated vertices.
     std::vector<Vertex> queries(numQueries);
@@ -74,7 +37,7 @@ int run() {
     // Brute-force ground truth, computed once and shared by both constructions.
     std::vector<std::vector<Vertex*>> knnResults(numQueries);
     for (uint32_t i = 0; i < numQueries; i++)
-        knnResults[i] = BruteForceKNN(vertices, queries[i], k);
+        knnResults[i] = test.BruteForceKNN(vertices, queries[i], k);
 
     // number of clusters C = round(sqrt(numVertices)) (see CreateClusterGraph);
     // ~10% of that many nearest foreign clusters get boundary-edge candidates
@@ -133,7 +96,7 @@ int run() {
             std::vector<Vertex*> results = ClusterANN::clusterGreedySearch(g, queries[i], 125, /*p=*/1);
             sumQueryMs += std::chrono::duration<double, std::milli>(Clock::now() - q0).count();
 
-            float recall = RecallAtK(results, knnResults[i]);
+            float recall = test.RecallAtK(results, knnResults[i]);
             sumRecall += recall;
             minRecall = std::min(minRecall, recall);
         }

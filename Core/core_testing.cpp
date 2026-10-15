@@ -1,12 +1,7 @@
-#include "testANNCentral.h"
-
-
-
-    
-
+#include "core_testing.h"
 
 //brute force knn search for ground truth
-    std::vector<Vertex*> TestANN::BruteForceKNN(const std::vector<Vertex*>& vertices, Vertex q, 
+    std::vector<Vertex*> TestANN::BruteForceKNN(const std::vector<Vertex*>& vertices, Vertex q,
         uint32_t k) {
         std::vector<Vertex*> sorted = vertices;
         std::sort(sorted.begin(), sorted.end(), [&](Vertex* a, Vertex* b) {
@@ -41,7 +36,3 @@ float TestANN::RecallAtK(const std::vector<Vertex*>& result, const std::vector<V
         if (found.count(v->id)) ++hits;
     return static_cast<float>(hits) / static_cast<float>(truth.size());
 }
-
-
-
-

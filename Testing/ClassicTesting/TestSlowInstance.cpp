@@ -1,4 +1,5 @@
-#include "testANNCentral.h"
+#include "../../DiskANN-Classic/DiskANN.h"
+#include "../../Core/core_testing.h"
 
 int testSlow(){
     TestANN test;

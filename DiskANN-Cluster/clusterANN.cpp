@@ -103,69 +103,6 @@ namespace ClusterANN {
         return clusters;
     }
 
-    void RobustPruning(Vertex& v, std::vector<Vertex*> U, float alpha, uint32_t R) {
-
-        U.insert(U.end(), v.out.begin(), v.out.end());
-
-        U.erase(std::remove_if(U.begin(), 
-            U.end(),
-            [&](Vertex* p) { return p->id == v.id; }), 
-            U.end()
-        );
-        
-        v.out.clear();
-
-        //loop thru the vertices in U sorted by distance to V
-        std::sort(U.begin(), U.end(), [&](Vertex* a, Vertex* b) {
-            return distance(*a, v) < distance(*b, v);
-        });
-        
-        while(!U.empty() && v.out.size() < R) {
-            //pick lowest distance vertex and add to v.next.
-            Vertex* u = U.front();
-            v.out.push_back(u);
-
-            //get remaining vertices that are not pruned   
-            std::vector<Vertex*> remaining;
-            remaining.reserve(U.size());
-
-            for(int i = 1; i < U.size(); i++) {
-                Vertex* w = U[i];
-                if(!(distance(*u, *w) * alpha <= distance(v, *w))) {
-                    remaining.push_back(w);
-                }
-            }
-            //reset U to remainders
-            U = std::move(remaining);
-        }
-
-
-    }
-
-    Vertex* Medoid(std::vector<Vertex*> v){
-        std::vector<float> mean(v[0]->data.size(), 0.0f);
-        for (Vertex* u : v)
-            for (size_t i = 0; i < u->data.size(); i++) mean[i] += u->data[i];
-        for (auto& m : mean) m /= v.size();
-
-        Vertex meanV; meanV.data = mean;
-        Vertex* best = nullptr; float bestD = 0;
-        for (Vertex* u : v) {
-            float d = distance(*u, meanV);
-            if (!best || d < bestD) { best = u; bestD = d; }
-        }
-        return best;
-    }
-
-    float distance(const Vertex& u, const Vertex& v) {
-    float dist = 0.0f;
-    for (uint32_t i = 0; i < u.data.size(); ++i) {
-        float diff = u.data[i] - v.data[i];
-        dist += diff * diff;
-    }
-    return sqrt(dist);
-    }
-
     ClusterGraph CreateClusterGraph(std::vector<Vertex*> v, float alpha, uint32_t pruneR, uint32_t totalR,
         uint32_t edgesPerPair, uint32_t poolSize, uint32_t numAdjacentClusters, EdgeMode edgeMode,
         uint32_t clustersPerVertex, uint32_t edgesPerCluster, uint32_t medoidR, double boundaryProportion){

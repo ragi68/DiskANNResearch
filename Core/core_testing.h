@@ -1,5 +1,5 @@
 #pragma once
-#include "DiskANN.h"
+#include "core.h"
 #include <random>
 #include <stdio.h>
 #include <iostream>

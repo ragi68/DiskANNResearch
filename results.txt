@@ -70,3 +70,89 @@ TAKEAWAYS
 
   Next: multi-medoid search entry, alpha-diversified targets per cluster, degree-matched comparison,
   and re-run idea 2 with reverse edges.
+
+
+==============================================================
+UPDATE (2026-10-14 / 2026-10-15): RE-RUNS, BACKBONE, PATCH GRAPH
+==============================================================
+
+Changes since the runs above:
+  - Search entry is now a coarse layer over the medoids (topLevelEdges, medoidR = 24;
+    coarseGreedySearch, p = 1) instead of the hub node.
+  - Idea 2 now includes the reverse edges noted above.
+  - New edge mode, IDEA 3: BACKBONE (BackBoneGraph, adjacencyEdges.cpp): the top
+    boundaryProportion of each cluster, scored by the length of the mean unit direction
+    to its in-cluster neighbours (findGlobalBoundaryNodes), is RobustPruned against the
+    boundary nodes of every other cluster; edges merged after in-cluster edges, cap totalR.
+  - New graph type, PATCH GRAPH (PatchGraph::PatchANN, DiskANN-Patch/patchANN.cpp): see below.
+
+
+RESULTS: cluster test re-run, same setup as above (128-D, n = 20000, 100 queries, L = 125, seed 42)
+----------------------------------------------------------------------------------------------------
+  Method                                   Build      Recall@10  Worst q  Avg query  Max degree
+  Idea 1: random pool                        63 s     0.523      0.0      6.22 ms    125
+  Idea 2: ranked, 14 x 3 + reverse edges     78 s     0.793      0.5      8.18 ms    125
+  Idea 3: backbone, proportion = 0.2        554 s     0.263      0.0      5.26 ms    125
+
+  - Idea 1 recall unchanged (0.523), so the Core/ refactor did not change behaviour.
+  - Idea 2 rose 0.743 -> 0.793 (reverse edges and/or coarse medoid entry; not separated).
+  - Two runs gave identical recall; an earlier run under machine load had ~30-40% slower
+    query times, so treat query times as +/- that.
+
+
+RESULTS: backbone boundaryProportion sweep (same setup; -sweep)
+--------------------------------------------------------------
+  Proportion   Build      Recall@10  Worst q  Avg query
+  0.05           91 s     0.155      0.0      4.50 ms
+  0.10          178 s     0.202      0.0      4.68 ms
+  0.20          563 s     0.263      0.0      5.66 ms
+  0.30         1210 s     0.329      0.0      5.31 ms
+  0.40         not measured (run stopped by the system for low memory)
+
+  - Recall grows ~+0.06 per +0.1 proportion; build grows ~proportion^2 (all-pairs pruning
+    over boundary nodes, RobustPruning recomputing distances in its sort comparator).
+  - Worst query stays 0.0 at every proportion.
+  - Suspected causes: only the boundary nodes get cross edges; the boundary score may be
+    near-noise in 128-D with ~142-point clusters; single-medoid search entry (p = 1).
+
+
+PATCH GRAPH  (PatchGraph::PatchANN, DiskANN-Patch/patchANN.cpp; -patch)
+----------------------------------------------------------------------
+  1. Patches of s = ceil(sqrt(n)) distinct vertices (142 at n = 20000), drawn uniformly
+     from a pool; a vertex leaves the pool once it is in k patches.
+  2. At most k * s patches; with spare slots (k * s^2 > k * n) every vertex ends in exactly
+     k patches. (Perfect-square n has no spare slots: a few vertices end one short of k.)
+  3. Slow preprocessing inside each patch: RobustPruning against the whole patch,
+     alpha = 1.2, R = 70. A vertex in several patches keeps its earlier edges as candidates.
+  4. Search: classic GreedySearch from the dataset medoid (same as the Vamana tests).
+
+RESULTS: 128-D, n = 20000 uniform [0,1000], 100 queries, search L = 125, seed 42
+  k    Patches   Build      Recall@10  Worst q  Avg query  Avg out-degree
+  2      283      142 s     0.574      0.3      5.04 ms    70.0
+  3      424      291 s     0.722      0.3      6.43 ms    70.0
+  4      565      379 s     0.766      0.4      5.29 ms    70.0
+  8     1131      718 s     0.829      0.5      6.55 ms    70.0
+  12    1693     1429 s     0.864      0.5      5.35 ms    70.0      (12 ~ n^(1/4))
+
+  - Every vertex was in exactly k patches at every k (test check passed).
+  - Diminishing returns: k 2 -> 4 gives +0.19 recall, k 4 -> 12 gives +0.10.
+  - Build grows faster than linearly in k once out-lists are full (more candidates per prune).
+  - Two points share a patch with probability ~ k / sqrt(n) (1.4% at k = 2, 8.5% at k = 12),
+    yet recall is high: likely because distances concentrate in 128-D uniform data, so
+    in-patch neighbours are still useful steps for greedy search. Not verified.
+
+
+COMPARISON  (128-D, n = 20000, L = 125)
+--------------------------------------
+  Method                          Build      Recall@10  Max degree
+  Vamana FastGraphCreation        2107 s     0.937      70
+  Patch, k = 12                   1429 s     0.864      70
+  Patch, k = 8                     718 s     0.829      70
+  Cluster, idea 2 ranked            78 s     0.793      125
+  Cluster, idea 1 random pool       63 s     0.523      125
+  Cluster, idea 3 backbone 0.2     554 s     0.263      125
+
+  Vamana was not re-run in this update (the -fast run was stopped by the system for low memory).
+
+  Next: patch graph on non-uniform data and/or larger n; backbone with bisector-margin
+  boundary selection and p > 1 medoid entry; re-run Vamana for a same-session baseline.

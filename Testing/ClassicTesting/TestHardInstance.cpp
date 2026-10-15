@@ -1,4 +1,5 @@
-#include "testANNCentral.h"
+#include "../../DiskANN-Classic/DiskANN.h"
+#include "../../Core/core_testing.h"
 // ===========================================================================
 //  HARD INSTANCE for DiskANN with FAST preprocessing
 //  (Indyk & Xu, NeurIPS 2023, section 4.1, adapted to this implementation)
