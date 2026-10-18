@@ -156,3 +156,53 @@ COMPARISON  (128-D, n = 20000, L = 125)
 
   Next: patch graph on non-uniform data and/or larger n; backbone with bisector-margin
   boundary selection and p > 1 medoid entry; re-run Vamana for a same-session baseline.
+
+
+==============================================================
+UPDATE (2026-10-15): HARD INSTANCE (fast preprocessing trap)
+==============================================================
+
+Instance: Testing/HardInstance.h (Indyk & Xu, NeurIPS 2023, sec. 4.1, adapted). 2-D,
+n = 20000, S = 1000. q = (0,0) is not in the set; a = true NN + 4 duplicates (Recall@5).
+  P  = 0.1n  thin strip nearest q (the trap)
+  P' = 0.1n  square just above a, nearest a (the shield)
+  M  = 0.8n  square at (-2.5,2.5)S, holds the dataset medoid (the ballast)
+All graphs: alpha = 2.0, R = 70, search L = 125. Flags: -hard -clusterhard -patchhard.
+
+Construction checks (identical in all three tests, all ok):
+  D(q,a) < min D(q,P)          799.9 <  1000.0   (+25.0%)
+  max D(q,P) < min D(q,P')    1288.4 <  1500.0   (+16.4%)
+  max D(q,P) < min D(q,M)     1288.4 <  3535.5   (+174.4%)
+  max D(a,P') < min D(a,P)     801.6 <  1000.0   (+24.8%)
+  2*max D(a,P') < min D(a,M)  1603.1 <  3023.2   (+88.6%)
+  |P'| >= build L               2025 >=    125
+
+RESULTS: Vamana FastGraphCreation (build L = 125)
+  Recall@5 = 0. Search from the medoid in M walks through P (ids 15978..) and stops
+  without reaching a (ids 19995-19999). The trap holds (test passes when recall < 0.5).
+
+RESULTS: cluster graph, one row per boundary-edge mode
+  Edges        Build     Start medoid   Visited   Recall@5   Avg query
+  old            1.7 s   in a           125       1.00       1.24 ms
+  ranked         5.2 s   in a           125       1.00       1.96 ms
+  backbone      12.7 s   in a           127       1.00       0.65 ms
+
+  - The coarse medoid layer picks a's own cluster as the search entry, so greedy search
+    starts next to the answer and never meets P. Recall 1.00 shows the coarse entry
+    sidesteps the trap; it does NOT test whether the cross-cluster edges could escape it.
+
+RESULTS: patch graph, membership-cap sweep
+  k    Patches   Build     Avg out-degree   Visited   Recall@5   Avg query
+  2      283      2.8 s    18.8             130       0.60       0.75 ms
+  3      424      4.7 s    20.7             130       0.80       0.69 ms
+  4      565      6.3 s    22.0             129       1.00       0.75 ms
+  8     1131     13.9 s    25.3             128       1.00       0.73 ms
+  12    1693     21.2 s    27.3             129       1.00       0.75 ms
+
+  - Search starts from the dataset medoid in M (same entry as Vamana), so this is a direct
+    comparison: the patch graph escapes the trap from k >= 4.
+  - Likely cause: random patches mix P, P', M and a, so in-patch pruning creates edges
+    from P (or M) to a that Vamana's local GreedySearch pools never contain. Not verified.
+
+  Next: force the cluster search to enter outside a's cluster (e.g. start in M) to test the
+  cross-cluster edges themselves; check which patch edges reach a at k = 2 vs k = 4.

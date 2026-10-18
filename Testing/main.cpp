@@ -3,7 +3,9 @@
 #include "ClassicTesting/TestHardInstance.cpp"
 #include "ClusterTesting/TestClusterInstance.cpp"
 #include "ClusterTesting/ClusterSweepTest.cpp"
+#include "ClusterTesting/TestClusterHardInstance.cpp"
 #include "PatchTesting/PatchSweepTest.cpp"
+#include "PatchTesting/TestPatchHardInstance.cpp"
 #include <cstring>
 #include <iostream>
 
@@ -12,10 +14,14 @@
 //   DiskANNTests -cluster      runs only the cluster ANN instance test
 //   DiskANNTests -sweep        runs only the backbone boundaryProportion sweep
 //   DiskANNTests -patch        runs only the patch graph membership-cap sweep
+//   DiskANNTests -clusterhard  runs only the hard instance on the cluster graph
+//   DiskANNTests -patchhard    runs only the hard instance on the patch graph
 //   DiskANNTests -slow -fast   runs only the named tests (any combination of
-//                              -slow -fast -hard -cluster -sweep -patch)
+//                              -slow -fast -hard -cluster -sweep -patch
+//                              -clusterhard -patchhard)
 int main(int argc, char** argv){
-    bool runSlow = false, runFast = false, runHard = false, runCluster = false, runSweep = false, runPatch = false;
+    bool runSlow = false, runFast = false, runHard = false, runCluster = false, runSweep = false, runPatch = false,
+         runClusterHard = false, runPatchHard = false;
     bool any = false;
 
     for (int i = 1; i < argc; i++) {
@@ -25,6 +31,8 @@ int main(int argc, char** argv){
         else if (std::strcmp(argv[i], "-cluster") == 0) { runCluster = true; any = true; }
         else if (std::strcmp(argv[i], "-sweep") == 0)   { runSweep = true;   any = true; }
         else if (std::strcmp(argv[i], "-patch") == 0)   { runPatch = true;   any = true; }
+        else if (std::strcmp(argv[i], "-clusterhard") == 0) { runClusterHard = true; any = true; }
+        else if (std::strcmp(argv[i], "-patchhard") == 0)   { runPatchHard = true;   any = true; }
         else std::cerr << "unrecognized argument: " << argv[i] << "\n";
     }
 
@@ -38,6 +46,8 @@ int main(int argc, char** argv){
     if (runCluster) result |= testClusterInstance();
     if (runSweep)   result |= testClusterSweep();
     if (runPatch)   result |= testPatchSweep();
+    if (runClusterHard) result |= testClusterHardInstance();
+    if (runPatchHard)   result |= testPatchHardInstance();
 
     return result;
 }
