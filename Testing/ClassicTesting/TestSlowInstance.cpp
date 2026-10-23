@@ -5,7 +5,7 @@ int testSlow(){
     TestANN test;
 
     std::mt19937 rng(42); // Fixed seed for reproducibility
-    uint32_t numVertices = 20000;
+    uint32_t numVertices = 50000;
     uint32_t dim = 128;
     uint32_t k = 10;
 

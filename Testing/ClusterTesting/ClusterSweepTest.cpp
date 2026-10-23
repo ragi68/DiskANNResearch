@@ -23,7 +23,7 @@ namespace ClusterSweep {
 int run() {
     TestANN test;
     std::mt19937 rng(42); // same seed as TestClusterInstance -> same data and queries
-    uint32_t numVertices = 20000;
+    uint32_t numVertices = 50000;
     uint32_t dim = 128;
     uint32_t k = 10;
     uint32_t L = 125;

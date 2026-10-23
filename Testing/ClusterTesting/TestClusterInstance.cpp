@@ -18,7 +18,7 @@ namespace ClusterTest {
 int run() {
     TestANN test;
     std::mt19937 rng(42); // fixed seed for reproducibility
-    uint32_t numVertices = 20000;
+    uint32_t numVertices = 50000;
     uint32_t dim = 128;
     uint32_t k = 10;
 
@@ -56,7 +56,7 @@ int run() {
     //
     // Ranked-edge knobs: each vertex sends edgesPerCluster edges into each of its
     // clustersPerVertex nearest foreign clusters (10% of all clusters, same as
-    // numAdjacentClusters: 14 at n=20000).
+    // numAdjacentClusters: 22 at n=50000).
     const uint32_t clustersPerVertex = numAdjacentClusters, edgesPerCluster = 3;
     const double boundaryProportion = 0.2;
 

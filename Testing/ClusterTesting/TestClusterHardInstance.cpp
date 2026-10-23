@@ -20,7 +20,7 @@ namespace ClusterHardTest {
 
 int run() {
     TestANN test;
-    const uint32_t n = 20000, L = 125;
+    const uint32_t n = 50000, L = 125;
     HardInstance inst = makeHardInstance(n, 1000.0);
     if (!inst.ok || !checkSeparations(inst, L)) { inst.freeAll(); return 1; }
 

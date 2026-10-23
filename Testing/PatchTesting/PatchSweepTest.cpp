@@ -23,14 +23,14 @@ namespace PatchSweep {
 int run() {
     TestANN test;
     std::mt19937 rng(42); // same seed as the cluster tests -> same data and queries
-    uint32_t numVertices = 20000;
+    uint32_t numVertices = 50000;
     uint32_t dim = 128;
     uint32_t k = 10;
     uint32_t L = 125;
 
     uint32_t numQueries = 100;
 
-    const uint32_t caps[] = {2, 3, 4, 8, 12};  // 12 ~ n^(1/4) at n = 20000
+    const uint32_t caps[] = {2, 3, 4, 8, 12, 15};  // n^(1/4) ~ 15 at n = 50000
 
     std::vector<Vertex*> vertices = test.RandomVertices(numVertices, dim, rng);
 
