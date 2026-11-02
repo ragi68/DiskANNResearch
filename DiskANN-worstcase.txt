@@ -1,0 +1,73 @@
+Diversion tactic from main M cluster  -> P cluster taht is closer than P' hwoever does NOT hold the true NN meanwhile the true NN is
+a part of P', with it being grid overlayed onto it.
+
+
+==============================================================
+HARD INSTANCES FOR THE CLUSTER AND PATCH GRAPHS (2026-11-02, design only, not built)
+==============================================================
+
+Context: the shared hard instance (Testing/HardInstance.h) targets FAST preprocessing.
+  - Cluster graph got recall 1.00 because the coarse layer entered a's own cluster;
+    it never tested the cross-cluster edges.
+  - Patch graph escaped at k >= 4 because random patches create P -> a edges.
+Each graph needs its own instance aimed at the mechanism that saved it.
+
+
+CLUSTER GRAPH: "WRONG CLUSTER, NO BRIDGE"
+-----------------------------------------
+Target: in-cluster edges are slow preprocessing, so a trap inside a cluster is absorbed.
+The weak points are the layers above:
+  1. Coarse layer picks only the cluster with the medoid nearest q (p = 1).
+  2. Cross-cluster edges are chosen from medoid geometry, not query geometry, and are
+     budgeted (40-point pools / 14 clusters x 3 edges per vertex).
+
+Construction (2-D): exactly C = sqrt(n) tight, well-separated blobs so k-means recovers
+them deterministically.
+  q  = origin.  a (+ duplicates) at 0.8S.
+  B  = a's cluster: a ball with a at its pole nearest q, medoid at ~1.3S. k-means puts
+       a in B, but B's medoid is not the nearest medoid to q.
+  A  = entry cluster: tight blob of >= L points at ~1.0S, away from a. Its medoid is the
+       nearest to q, so the coarse layer correctly picks A. All of A is farther from q
+       than a.
+  Decoys = >= 15 small clusters ringing A, whose medoids are closer (in bisector distance)
+       to A's points than B's medoid is, and all farther from q than every A point.
+
+Why it fails:
+  - Ranked mode: A's near-q points spend all 14 cross-cluster slots on decoys, none on B.
+  - Random pool mode: A has no pool facing B.
+  - Backbone mode: pruning picks the nearer decoy boundary nodes.
+  - Decoys may link on to B, but are never expanded: A fills the L list with closer points.
+
+Tests whether the cross-cluster bridges can carry a search (the "start in M" follow-up,
+made precise).
+Control: run classic slow preprocessing on the same points. If it gets recall 1 and the
+cluster graph gets 0, the failure belongs to the cluster structure.
+
+
+PATCH GRAPH: "DEFLECTOR"
+------------------------
+Target: no back-edges, so v -> a exists only if v shares a patch with a AND a survives
+pruning inside that patch. A patch is a random ~142-point sample, so any group of ~0.1n
+points appears ~14 times in every patch: dense groups always take part in pruning. The
+patch graph behaves like slow preprocessing at group scale, so its hard instance is the
+slow preprocessing one: slow preprocessing only guarantees a (alpha+1)/(alpha-1)
+approximation, not the exact NN.
+
+Construction: keep q, a, strip P and ballast M from HardInstance.h, and add a dense
+deflector R (~0.1n points). For each P vertex v that the search actually scans, R must be:
+  1. closer to v than a is (so R is considered first in pruning),
+  2. within d(v,a)/alpha of a (so R prunes a: v -> a becomes v -> R),
+  3. farther from q than every scanned P vertex (so R never enters the L list).
+Only the P vertices nearest q need deflecting; the strip already makes the vertices near a
+get scanned last. The same rule removes direct M -> a edges.
+
+Catch: at alpha = 2.0 (the hard tests' setting) these constraints are tight. For a scanned
+P vertex near y = 0, R must lie within ~0.64 of a yet farther from q than P; first-pass
+placements did not satisfy all three. At alpha = 1.2 (the patch graph default on random
+data) there is plenty of room. Either move the strip or run the patch hard test at 1.2.
+
+Control: classic slow preprocessing should also fail on this (approximation-ratio instance,
+not patch-specific). Fair claim: the patch graph matches slow preprocessing even on its bad
+case, a stronger result than "beats fast preprocessing".
+
+Next: solve exact coordinates satisfying all constraints; then a HardInstance-style builder.
